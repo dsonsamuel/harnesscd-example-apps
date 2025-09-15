@@ -284,35 +284,7 @@ pipeline:
           pipeline: iw_multi_env
           project: swdi
           inputSetReferences: []
-          inputs:
-            identifier: iw_multi_env
-            template:
-              templateInputs:
-                stages:
-                  - parallel:
-                      - stage:
-                          identifier: cluster
-                          type: Deployment
-                          spec:
-                            service:
-                              serviceRef: <+ <+pipeline.properties.ci.codebase.repoName>.replace("-","_") >
-                              serviceInputs: ""
-                variables:
-                  - name: release_version
-                    type: String
-                    value: <+pipeline.stages.Validation.spec.execution.steps.Custom_Steps.steps.Get_Chart_Version.output.outputVariables.currentVersion>
-                  - name: override_file
-                    type: String
-                    value: bld-01-config.yaml
-                  - name: additional_override_file
-                    type: String
-                    value: ""
-                  - name: target_cluster
-                    type: String
-                    value: Default
-                  - name: action
-                    type: String
-                    value: Deploy
+          inputs: {}
         when:
           pipelineStatus: Success
           condition: |-
