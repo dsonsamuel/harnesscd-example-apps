@@ -301,3 +301,9 @@ pipeline:
   tags: {}
   projectIdentifier: gemcr
   orgIdentifier: btbt1
+  properties:
+    ci:
+      codebase:
+        connectorRef: harnessgitconnector
+        build: <+input>
+        sparseCheckout: []
