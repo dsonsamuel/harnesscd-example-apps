@@ -10,10 +10,10 @@ pipeline:
           service:
             serviceRef: <+ <+pipeline.properties.ci.codebase.repoName>.replace("-","_") >
           environment:
-            environmentRef: gcp_cne_rtl_bld
+            environmentRef: gcp_rtl_pre
             deployToAll: false
             infrastructureDefinitions:
-              - identifier: iw_swd_bld_01_kcl_euwe2_sww
+              - identifier: ns_aced9b_int_europe_west2_caas
             failureStrategies:
               - onFailure:
                   errors:
