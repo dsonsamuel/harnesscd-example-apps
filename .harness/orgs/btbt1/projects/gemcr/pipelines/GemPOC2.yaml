@@ -1,0 +1,331 @@
+pipeline:
+  stages:
+    - stage:
+        name: Get Service Def
+        identifier: Get_Service_Def
+        description: ""
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: <+ <+pipeline.properties.ci.codebase.repoName>.replace("-","_") >
+          environment:
+            environmentRef: gcp_cne_rtl_bld
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: iw_swd_bld_01_kcl_euwe2_sww
+            failureStrategies:
+              - onFailure:
+                  errors:
+                    - AllErrors
+                  action:
+                    type: Abort
+          execution:
+            steps:
+              - step:
+                  type: Wait
+                  name: Wait_1
+                  identifier: Wait_1
+                  spec:
+                    duration: 10m
+                  when:
+                    stageStatus: Success
+                    condition: "false"
+            rollbackSteps:
+              - step:
+                  name: Rollback Rollout Deployment
+                  identifier: rollbackRolloutDeployment
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec:
+                    pruningEnabled: false
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+    - parallel:
+        - stage:
+            name: Validation
+            identifier: Validation
+            template:
+              templateRef: account.CI_Stage_Custom
+              versionLabel: v1.0.0
+              gitBranch: main
+              templateInputs:
+                type: CI
+                spec:
+                  execution:
+                    steps:
+                      - insert:
+                          identifier: Custom_Steps
+                          steps:
+                            - step:
+                                type: Run
+                                name: Helm Validation
+                                identifier: Helm_Validation
+                                spec:
+                                  connectorRef: account.gcp_ddv_ssv_dev_gar
+                                  image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/docker-release/dwt1/swdc/dcs_helm_base:0.0.11
+                                  shell: Bash
+                                  command: |-
+                                    if [ -f ./generateTemplate.sh ]
+                                    then
+                                      chmod +x generateTemplate.sh
+                                      ./generateTemplate.sh
+                                    fi
+                            - step:
+                                type: Run
+                                name: Get Chart Version
+                                identifier: Get_Chart_Version
+                                spec:
+                                  connectorRef: account.gcp_ddv_ssv_dev_gar
+                                  image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/docker-release/dwt1/swdc/dcs_helm_base:0.0.11
+                                  shell: Sh
+                                  command: |-
+                                    export CURR_VERSION=$(yq .appVersion helm-charts/${CHART_NAME}/Chart.yaml)
+
+                                    echo "Helm chart appVersion: ${CURR_VERSION}"
+                                  envVariables:
+                                    CHART_NAME: <+pipeline.stages.Get_Service_Def.spec.serviceVariables.chartName>
+                                  outputVariables:
+                                    - name: currentVersion
+                                      type: String
+                                      value: CURR_VERSION
+                            - step:
+                                type: Run
+                                name: Check Tag Exists
+                                identifier: Check_Tag_Exists
+                                spec:
+                                  connectorRef: account.gcp_rtl_ssv_release_gar
+                                  image: deployment_services/dsharness/al22074/images/docker.io/harness/drone-git:1.5.4-rootless
+                                  shell: Sh
+                                  command: |-
+                                    REPO_OWNER="lbg-gcp-foundation"
+                                    STATUS=$(curl -so /dev/null \
+                                              -w "%{http_code}" \
+                                              -H "Authorization: token $GH_TOKEN" \
+                                              -H "Content-Type: application/json" \
+                                              https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/git/ref/tags/release_v${CURR_VERSION})
+
+                                    echo "Checking github tag exists: release_v${CURR_VERSION}"
+
+                                    if [ "${STATUS}" -eq 200 ]
+                                    then
+                                      echo "❌ Error: Github tag already exists - exiting. Consider updating Helm Chart appVersion." 1>&2
+                                      exit 1
+                                    fi
+                                  envVariables:
+                                    GH_TOKEN: <+secrets.getValue("account.pat_token_lbg_gcp_foundation")>
+                                    REPO_NAME: <+pipeline.properties.ci.codebase.repoName>
+                                    CURR_VERSION: <+pipeline.stages.Validation.spec.execution.steps.Custom_Steps.steps.Get_Chart_Version.output.outputVariables.currentVersion>
+                                when:
+                                  stageStatus: Success
+                            - step:
+                                type: Run
+                                name: Check CHANGELOG
+                                identifier: Check_CHANGELOG
+                                spec:
+                                  connectorRef: account.gcp_rtl_ssv_release_gar
+                                  image: deployment_services/dsharness/al22074/images/docker.io/harness/drone-git:1.5.4-rootless
+                                  shell: Sh
+                                  command: |-
+                                    if [ -f "CHANGELOG.md" ]
+                                    then
+                                      if ! grep -qE "( |\[)${CURR_VERSION}( |\]|\$)" CHANGELOG.md
+                                      then
+                                        echo "❌ Error: CHANGELOG.md has not been updated for version ${CURR_VERSION}. Please update the changelog" 1>&2
+                                        exit 1
+                                      fi
+                                    fi
+                                  envVariables:
+                                    GH_TOKEN: <+secrets.getValue("account.pat_token_lbg_gcp_foundation")>
+                                    REPO_NAME: <+pipeline.properties.ci.codebase.repoName>
+                                    CURR_VERSION: <+pipeline.stages.Validation.spec.execution.steps.Custom_Steps.steps.Get_Chart_Version.output.outputVariables.currentVersion>
+                                when:
+                                  stageStatus: Success
+                failureStrategies:
+                  - onFailure:
+                      errors:
+                        - AllErrors
+                      action:
+                        type: Abort
+                when:
+                  pipelineStatus: Success
+        - stage:
+            name: App Validation
+            identifier: App_Validation
+            template:
+              templateRef: account.CI_Stage_App_Validate
+              versionLabel: v0.1.0
+              gitBranch: main
+              templateInputs:
+                type: CI
+                spec:
+                  execution:
+                    steps:
+                      - step:
+                          identifier: Setup
+                          type: Run
+                          spec:
+                            resources:
+                              limits:
+                                memory: 1Gi
+                                cpu: 1
+                            logCollectionEnabled: true
+                      - step:
+                          identifier: Gitleaks_Scan
+                          type: Gitleaks
+                          spec:
+                            advanced:
+                              log:
+                                level: info
+                              fail_on_severity: high
+                            resources:
+                              limits:
+                                memory: 1Gi
+                                cpu: 1
+                      - step:
+                          identifier: FlashAPIValidator
+                          type: Run
+                          spec:
+                            resources:
+                              limits:
+                                memory: 1Gi
+                                cpu: 1
+                            logCollectionEnabled: false
+                variables:
+                  - name: FLASH_VALIDATOR_OPENAPI_SPEC
+                    type: String
+                    value: /harness/swagger.json
+    - stage:
+        name: Create Release
+        identifier: Create_Release
+        template:
+          templateRef: account.CI_Stage_Custom
+          versionLabel: v1.0.0
+          gitBranch: main
+          templateInputs:
+            type: CI
+            spec:
+              execution:
+                steps:
+                  - insert:
+                      identifier: Custom_Steps
+                      steps:
+                        - step:
+                            type: Run
+                            name: Create Release
+                            identifier: Create_Release
+                            spec:
+                              connectorRef: account.gcp_rtl_ssv_release_gar
+                              image: deployment_services/dsharness/al22074/images/docker.io/harness/drone-git:1.5.4-rootless
+                              shell: Sh
+                              command: |-
+                                REPO_OWNER="lbg-gcp-foundation"
+                                TAG_NAME="release_v${CURR_VERSION}"
+                                RELEASE_NAME="${TAG_NAME}"
+                                RELEASE_BODY="Harness release - ${TAG_NAME}"
+                                DRAFT=false
+                                PRERELEASE=false
+
+                                echo "REPO NAME [${REPO_NAME}] BRANCH [${BRANCH}]"
+
+                                # Create GitHub release
+                                httpCode=$(curl -o /dev/null -s -w "%{http_code}" -X POST \
+                                    -H "Authorization: token $GH_TOKEN" \
+                                    -H "X-GitHub-Api-Version: 2022-11-28" \
+                                    -H "Accept: application/vnd.github+json" \
+                                    -H "Content-Type: application/json" \
+                                    -d "{
+                                        \"tag_name\": \"$TAG_NAME\",
+                                        \"name\": \"$RELEASE_NAME\",
+                                        \"body\": \"$RELEASE_BODY\",
+                                        \"draft\": $DRAFT,
+                                        \"prerelease\": $PRERELEASE,
+                                        \"target_commitish\": \"$BRANCH\"
+                                    }" \
+                                    https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases)
+
+                                # Check if the release was created successfully
+                                if [[ ${httpCode} == "201" ]]; then
+                                    echo "Release created successfully."
+                                else
+                                    echo "Failed to create release. ${httpCode}"
+                                    echo "Info: User lbg-ci-robot-gcpfoundationharness must have write permissions in order to tag repo ${REPO_NAME}"
+                                    exit 1
+                                fi
+                              envVariables:
+                                GH_TOKEN: <+secrets.getValue("account.pat_token_lbg_gcp_foundation")>
+                                REPO_NAME: <+pipeline.properties.ci.codebase.repoName>
+                                CURR_VERSION: <+pipeline.stages.Validation.spec.execution.steps.Custom_Steps.steps.Get_Chart_Version.output.outputVariables.currentVersion>
+                                BRANCH: <+pipeline.properties.ci.codebase.build.spec.branch>
+            failureStrategies:
+              - onFailure:
+                  errors:
+                    - AllErrors
+                  action:
+                    type: Abort
+            when:
+              pipelineStatus: Success
+              condition: |-
+                <+pipeline.properties.ci.codebase.build.spec.branch> == "main"
+                or
+                <+pipeline.properties.ci.codebase.build.spec.branch> == "master"
+    - stage:
+        name: Deploy To BLD
+        identifier: Deploy_To_BLD
+        description: ""
+        type: Pipeline
+        spec:
+          org: dwt1
+          pipeline: iw_multi_env
+          project: swdi
+          inputSetReferences: []
+          inputs:
+            identifier: iw_multi_env
+            template:
+              templateInputs:
+                stages:
+                  - parallel:
+                      - stage:
+                          identifier: cluster
+                          type: Deployment
+                          spec:
+                            service:
+                              serviceRef: <+ <+pipeline.properties.ci.codebase.repoName>.replace("-","_") >
+                              serviceInputs: ""
+                variables:
+                  - name: release_version
+                    type: String
+                    value: <+pipeline.stages.Validation.spec.execution.steps.Custom_Steps.steps.Get_Chart_Version.output.outputVariables.currentVersion>
+                  - name: override_file
+                    type: String
+                    value: bld-01-config.yaml
+                  - name: additional_override_file
+                    type: String
+                    value: ""
+                  - name: target_cluster
+                    type: String
+                    value: Default
+                  - name: action
+                    type: String
+                    value: Deploy
+        when:
+          pipelineStatus: Success
+          condition: |-
+            <+pipeline.properties.ci.codebase.build.spec.branch> == "main"
+            or
+            <+pipeline.properties.ci.codebase.build.spec.branch> == "master"
+        tags: {}
+  variables: []
+  allowStageExecutions: false
+  timeout: 30m
+  fixedInputsOnRerun: false
+  name: GemPOC2
+  identifier: GemPOC2
+  tags: {}
+  projectIdentifier: gemcr
+  orgIdentifier: btbt1
