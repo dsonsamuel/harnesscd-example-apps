@@ -8,7 +8,7 @@ pipeline:
         spec:
           deploymentType: Kubernetes
           service:
-            serviceRef: <+ <+pipeline.properties.ci.codebase.repoName>.replace("-","_") >
+            serviceRef: Gem_ser1
           environment:
             environmentRef: gcp_rtl_pre
             deployToAll: false
