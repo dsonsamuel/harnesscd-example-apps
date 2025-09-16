@@ -397,6 +397,7 @@ pipeline:
   properties:
     ci:
       codebase:
-        connectorRef: harnessgitconnector
+        connectorRef: Github_connector
+        repoName: gc_poc
         build: <+input>
         sparseCheckout: []
