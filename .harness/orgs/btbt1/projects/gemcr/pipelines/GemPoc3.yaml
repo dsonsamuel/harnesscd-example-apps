@@ -21,22 +21,51 @@ pipeline:
               - identifier: ns_aced9b_int_europe_west2_caas
           execution:
             steps:
-              - step:
-                  name: Rollout Deployment
-                  identifier: rolloutDeployment
-                  type: K8sRollingDeploy
-                  timeout: 10m
-                  spec:
-                    skipDryRun: false
-                    pruningEnabled: false
+              - stepGroup:
+                  name: Canary Deployment
+                  identifier: canaryDeployment
+                  steps:
+                    - step:
+                        name: Canary Deployment
+                        identifier: canaryDeployment
+                        type: K8sCanaryDeploy
+                        timeout: 10m
+                        spec:
+                          instanceSelection:
+                            type: Count
+                            spec:
+                              count: 1
+                          skipDryRun: false
+                    - step:
+                        name: Canary Delete
+                        identifier: canaryDelete
+                        type: K8sCanaryDelete
+                        timeout: 10m
+                        spec: {}
+              - stepGroup:
+                  name: Primary Deployment
+                  identifier: primaryDeployment
+                  steps:
+                    - step:
+                        name: Rolling Deployment
+                        identifier: rollingDeployment
+                        type: K8sRollingDeploy
+                        timeout: 10m
+                        spec:
+                          skipDryRun: false
             rollbackSteps:
               - step:
-                  name: Rollback Rollout Deployment
-                  identifier: rollbackRolloutDeployment
+                  name: Canary Delete
+                  identifier: rollbackCanaryDelete
+                  type: K8sCanaryDelete
+                  timeout: 10m
+                  spec: {}
+              - step:
+                  name: Rolling Rollback
+                  identifier: rollingRollback
                   type: K8sRollingRollback
                   timeout: 10m
-                  spec:
-                    pruningEnabled: false
+                  spec: {}
         tags: {}
         failureStrategies:
           - onFailure:
@@ -44,10 +73,3 @@ pipeline:
                 - AllErrors
               action:
                 type: StageRollback
-  properties:
-    ci:
-      codebase:
-        connectorRef: Github_connector
-        repoName: gc_poc
-        build: <+input>
-        sparseCheckout: []
