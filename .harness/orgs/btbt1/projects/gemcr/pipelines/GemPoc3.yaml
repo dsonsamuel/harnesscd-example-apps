@@ -10,14 +10,12 @@ pipeline:
         spec:
           deploymentType: Kubernetes
           service:
-            serviceRef: <+input>
-            serviceInputs: <+input>
+            serviceRef: Gem_ser1
           environment:
-            environmentRef: <+input>
+            environmentRef: gcp_rtl_pre
             deployToAll: false
-            environmentInputs: <+input>
-            serviceOverrideInputs: <+input>
-            infrastructureDefinitions: <+input>
+            infrastructureDefinitions:
+              - identifier: ns_aced9b_int_europe_west2_caas
           execution:
             steps:
               - step:
@@ -396,3 +394,9 @@ pipeline:
         name: GCDeploy
         identifier: GCDeploy
         tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: harnessgitconnector
+        build: <+input>
+        sparseCheckout: []
