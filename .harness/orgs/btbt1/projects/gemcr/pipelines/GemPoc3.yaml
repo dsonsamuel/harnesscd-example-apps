@@ -22,6 +22,8 @@ pipeline:
               namespace: ns-aced9b
               automountServiceAccountToken: true
               nodeSelector: {}
+              securityContext:
+                allowPrivilegeEscalation: false
               containerSecurityContext:
                 capabilities:
                   drop:
