@@ -18,14 +18,10 @@ pipeline:
           infrastructure:
             type: KubernetesDirect
             spec:
-              connectorRef: account.gcp_ew2_dev_caas_01_standard
+              connectorRef: Gem_kube
               namespace: ns-aced9b
               automountServiceAccountToken: true
               nodeSelector: {}
-              securityContext:
-                runAsUser: 1000
-                runAsGroup: 3000
-                fsGroup: 2000
               containerSecurityContext:
                 capabilities:
                   drop:
