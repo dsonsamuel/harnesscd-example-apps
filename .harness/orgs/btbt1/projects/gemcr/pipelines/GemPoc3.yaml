@@ -18,17 +18,17 @@ pipeline:
           infrastructure:
             type: KubernetesDirect
             spec:
-              connectorRef: account.gcp_ew2_dev_caas_01_standard
+              connectorRef: Gem_kube
               namespace: ns-aced9b
               automountServiceAccountToken: true
               nodeSelector: {}
-              os: Linux
               containerSecurityContext:
                 capabilities:
                   drop:
                     - ALL
                 privileged: true
                 allowPrivilegeEscalation: true
+              os: Linux
           execution:
             steps:
               - step:
