@@ -18,7 +18,7 @@ pipeline:
           infrastructure:
             type: KubernetesDirect
             spec:
-              connectorRef: account.ew2_msv_dev_caas01_svp01_gke01
+              connectorRef: account.gcp_ew2_dev_caas_01_standard
               namespace: ns-aced9b
               automountServiceAccountToken: true
               nodeSelector: {}
