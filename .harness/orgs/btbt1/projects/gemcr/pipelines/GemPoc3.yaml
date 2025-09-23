@@ -19,7 +19,7 @@ pipeline:
             type: KubernetesDirect
             spec:
               connectorRef: account.central_ci
-              namespace: ns-aced9b
+              namespace: <+input>
               automountServiceAccountToken: true
               nodeSelector: {}
               containerSecurityContext:
