@@ -23,6 +23,9 @@ pipeline:
               automountServiceAccountToken: true
               nodeSelector: {}
               os: Linux
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
           execution:
             steps:
               - step:
@@ -30,6 +33,9 @@ pipeline:
                   name: Code compile
                   identifier: Code_compile
                   spec:
+                    securityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1000
                     connectorRef: account.gcp_rtl_ssv_release_gar
                     image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
                     shell: Sh
