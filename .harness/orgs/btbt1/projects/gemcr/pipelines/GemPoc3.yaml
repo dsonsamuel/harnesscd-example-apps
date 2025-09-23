@@ -6,70 +6,75 @@ pipeline:
   tags: {}
   stages:
     - stage:
-        name: GCDeploy
-        identifier: GCDeploy
+        name: Build test and run
+        identifier: Build_test_and_run
         description: ""
-        type: Deployment
+        type: CI
         spec:
-          deploymentType: Kubernetes
-          service:
-            serviceRef: Gem_ser1
-          environment:
-            environmentRef: gcp_rtl_pre
-            deployToAll: false
-            infrastructureDefinitions:
-              - identifier: ns_aced9b_int_europe_west2_caas
+          cloneCodebase: true
+          caching:
+            enabled: true
+            override: false
+          infrastructure:
+            type: KubernetesDirect
+            spec:
+              connectorRef: account.gcp_ew2_dev_caas_01_standard
+              namespace: ns-aced9b
+              automountServiceAccountToken: true
+              nodeSelector: {}
+              os: Linux
           execution:
             steps:
-              - stepGroup:
-                  name: Canary Deployment
-                  identifier: canaryDeployment
-                  steps:
-                    - step:
-                        name: Canary Deployment
-                        identifier: canaryDeployment
-                        type: K8sCanaryDeploy
-                        timeout: 10m
-                        spec:
-                          instanceSelection:
-                            type: Count
-                            spec:
-                              count: 1
-                          skipDryRun: false
-                    - step:
-                        name: Canary Delete
-                        identifier: canaryDelete
-                        type: K8sCanaryDelete
-                        timeout: 10m
-                        spec: {}
-              - stepGroup:
-                  name: Primary Deployment
-                  identifier: primaryDeployment
-                  steps:
-                    - step:
-                        name: Rolling Deployment
-                        identifier: rollingDeployment
-                        type: K8sRollingDeploy
-                        timeout: 10m
-                        spec:
-                          skipDryRun: false
-            rollbackSteps:
               - step:
-                  name: Canary Delete
-                  identifier: rollbackCanaryDelete
-                  type: K8sCanaryDelete
-                  timeout: 10m
-                  spec: {}
+                  type: Run
+                  name: Code compile
+                  identifier: Code_compile
+                  spec:
+                    connectorRef: account.gcp_rtl_ssv_release_gar
+                    image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
+                    shell: Sh
+                    command: |-
+                      touch pythondockerfile
+                      cat > pythondockerfile <<- EOM
+                      RUN pip install -r requirements.txt
+                      EOM
+                      cat pythondockerfile
               - step:
-                  name: Rolling Rollback
-                  identifier: rollingRollback
-                  type: K8sRollingRollback
-                  timeout: 10m
-                  spec: {}
-        tags: {}
-        failureStrategies:
-          - onFailure:
-              errors:
-                - AllErrors
-              action:
-                type: StageRollback
+                  type: Run
+                  name: Output
+                  identifier: Output
+                  spec:
+                    connectorRef: account.gcp_rtl_ssv_release_gar
+                    image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
+                    shell: Sh
+                    command: |-
+                      PKG_NAME=<+stage.spec.execution.steps.Initialise_Build_Engine.output.outputVariables.PKG_NAME>
+                      PKG_VERSION=<+stage.spec.execution.steps.Initialise_Build_Engine.output.outputVariables.PKG_VERSION>
+                      PKG_PATH=<+stage.spec.execution.steps.Initialise_Build_Engine.output.outputVariables.ARTIFACT_URL>
+              - step:
+                  type: Run
+                  name: Python server
+                  identifier: Python_server
+                  spec:
+                    connectorRef: account.gcp_rtl_ssv_release_gar
+                    image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
+                    shell: Sh
+                    command: uvicorn main:app --reload --port 8002 &
+              - step:
+                  type: Run
+                  name: test connection to server
+                  identifier: test_connection_to_server
+                  spec:
+                    connectorRef: account.gcp_rtl_ssv_release_gar
+                    image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
+                    shell: Sh
+                    command: |-
+                      sleep 20
+                       curl -X POST http://127.0.0.1:8002/ask_database -H "Content-Type: application/json" -d '{"question": "Give me my top  accounts and balances?"}'
+  properties:
+    ci:
+      codebase:
+        connectorRef: Github_connector
+        repoName: ma_gemini_langchain
+        build: <+input>
+        sparseCheckout: []
