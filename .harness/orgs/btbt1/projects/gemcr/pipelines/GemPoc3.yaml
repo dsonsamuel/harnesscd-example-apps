@@ -199,6 +199,6 @@ pipeline:
     ci:
       codebase:
         connectorRef: Github_connector
-        repoName: python-pipeline
+        repoName: ma_gemini_langchain
         build: <+input>
         sparseCheckout: []
