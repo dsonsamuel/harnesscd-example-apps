@@ -107,8 +107,10 @@ pipeline:
                     image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
                     shell: Sh
                     command: |-
-                      sleep 10
+                      sleep 180
                       curl localhost:8000
+                  when:
+                    stageStatus: Success
           sharedPaths:
             - /shared
             - /shared/scan_results
