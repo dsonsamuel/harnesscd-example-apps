@@ -95,10 +95,10 @@ pipeline:
                     connectorRef: account.gcp_rtl_ssv_release_gar
                     image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
                     shell: Sh
-                    command: |-
-                      #pip install -r requirements.txt
-                      #uvicorn main:app --reload --host 0.0.0.0 --port 8000 &
-                      docker buildx build -t ma_lang .
+                    command: |
+                      pip install -r requirements.txt
+                      pwd
+                      uvicorn main:app --reload --host 0.0.0.0 --port 8000 
           sharedPaths:
             - /shared
             - /shared/scan_results
