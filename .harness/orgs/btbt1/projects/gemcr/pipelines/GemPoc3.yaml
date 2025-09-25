@@ -99,10 +99,20 @@ pipeline:
                       pip install fastapi 
                       pip install langchain
                       pip install google
-                      pwd
-                      uvicorn main:app --reload --host 0.0.0.0 --port 8000 
+                       
                     envVariables:
                       PIP_CACHE_DIR: "\"/root/.cache\""
+              - step:
+                  type: Run
+                  name: Run_3
+                  identifier: Run_3
+                  spec:
+                    connectorRef: account.gcp_rtl_ssv_release_gar
+                    image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
+                    shell: Sh
+                    command: |-
+                      pwd
+                      uvicorn main:app --reload --host 0.0.0.0 --port 8000
           sharedPaths:
             - /shared
             - /shared/scan_results
