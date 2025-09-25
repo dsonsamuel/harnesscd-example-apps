@@ -111,9 +111,7 @@ pipeline:
                     image: europe-docker.pkg.dev/ssv-rtl-devops-registry-624/release/python:<+stage.variables.PYTHON_VERSION>
                     shell: Sh
                     command: |-
-                      sleep 30
-                      cd /
-                      pwd
+                      pip install fastapi uvicorn
                       uvicorn main:app --reload --host 0.0.0.0 --port 8000
           sharedPaths:
             - /shared
